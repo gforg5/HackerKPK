@@ -1,0 +1,10 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /course_thumbnails/{courseId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null && 
+        firestore.get(/databases/ai-studio-cc13bea4-6397-42ae-bcb0-1dc086d8b148/documents/users/$(request.auth.uid)).data.role == 'teacher';
+    }
+  }
+}

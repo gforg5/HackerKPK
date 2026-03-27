@@ -1,0 +1,76 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with role and access status.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["admin", "teacher", "student"] },
+        "status": { "type": "string", "enum": ["pending", "approved"] },
+        "accessPassword": { "type": "string", "description": "Unique password for student access." }
+      },
+      "required": ["uid", "email", "role", "status"]
+    },
+    "Course": {
+      "title": "Course",
+      "description": "Hacking course content.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "thumbnailUrl": { "type": "string" }
+      },
+      "required": ["id", "title", "teacherId", "createdAt"]
+    },
+    "Lesson": {
+      "title": "Lesson",
+      "description": "Individual lesson within a course.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "courseId": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string", "description": "Markdown content for the lesson." },
+        "order": { "type": "integer" },
+        "fileUrls": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["id", "courseId", "title", "content", "order"]
+    },
+    "Progress": {
+      "title": "Progress",
+      "description": "Student progress in a course.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "courseId": { "type": "string" },
+        "completedLessons": { "type": "array", "items": { "type": "string" } },
+        "lastAccessed": { "type": "string", "format": "date-time" },
+        "completionPercentage": { "type": "number" }
+      },
+      "required": ["uid", "courseId", "completedLessons", "lastAccessed", "completionPercentage"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and permissions."
+    },
+    "/courses/{courseId}": {
+      "schema": "Course",
+      "description": "Course metadata."
+    },
+    "/courses/{courseId}/lessons/{lessonId}": {
+      "schema": "Lesson",
+      "description": "Lesson content and files."
+    },
+    "/progress/{progressId}": {
+      "schema": "Progress",
+      "description": "Student course progress tracking."
+    }
+  }
+}

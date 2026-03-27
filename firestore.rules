@@ -1,0 +1,116 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required)
+    //   - role: string (admin, teacher, student)
+    //   - status: string (pending, approved)
+    //   - accessPassword: string (optional, for students)
+    //
+    // Collection: courses
+    // Fields:
+    //   - id: string (required)
+    //   - title: string (required)
+    //   - description: string
+    //   - teacherId: string (required)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: lessons (subcollection of courses)
+    // Fields:
+    //   - id: string (required)
+    //   - courseId: string (required)
+    //   - title: string (required)
+    //   - content: string (required)
+    //   - order: int (required)
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "goodforg555@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isTeacher() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher';
+    }
+
+    function isApprovedStudent() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student' &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'approved';
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'role', 'status']) &&
+             data.uid is string &&
+             data.email is string &&
+             data.role in ['admin', 'teacher', 'student'] &&
+             data.status in ['pending', 'approved'];
+    }
+
+    // Rules
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && isOwner(userId) && 
+                      request.resource.data.role in ['student', 'teacher'] &&
+                      request.resource.data.status == 'pending';
+      allow update: if isAdmin() || (isOwner(userId) && 
+                      request.resource.data.role == resource.data.role &&
+                      request.resource.data.status == resource.data.status);
+    }
+
+    match /courses/{courseId} {
+      allow read: if true; // Publicly readable for search and landing page
+      allow create: if isAdmin() || isTeacher();
+      allow update, delete: if isAdmin() || (isTeacher() && resource.data.teacherId == request.auth.uid);
+
+      match /lessons/{lessonId} {
+        allow read: if isAuthenticated() && (isAdmin() || isTeacher() || isApprovedStudent());
+        allow create, update, delete: if isAdmin() || (isTeacher() && get(/databases/$(database)/documents/courses/$(courseId)).data.teacherId == request.auth.uid);
+      }
+    }
+
+    match /progress/{progressId} {
+      allow read: if isAuthenticated() && (isAdmin() || isTeacher() || isOwner(resource.data.uid));
+      allow create, update: if isAuthenticated() && isOwner(request.resource.data.uid);
+      allow delete: if isAdmin();
+    }
+
+    match /badges/{badgeId} {
+      allow read: if isAuthenticated() && (isAdmin() || isTeacher() || isOwner(resource.data.uid));
+      allow create: if isAuthenticated() && isOwner(request.resource.data.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    match /certificates/{certId} {
+      allow read: if isAuthenticated() && (isAdmin() || isTeacher() || isOwner(resource.data.uid));
+      allow create: if isAuthenticated() && isOwner(request.resource.data.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    match /ratings/{ratingId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isOwner(request.resource.data.uid) && 
+                      request.resource.data.rating >= 1 && request.resource.data.rating <= 5;
+      allow update: if isAuthenticated() && isOwner(resource.data.uid) && 
+                      request.resource.data.rating >= 1 && request.resource.data.rating <= 5;
+      allow delete: if isAdmin() || isOwner(resource.data.uid);
+    }
+  }
+}
